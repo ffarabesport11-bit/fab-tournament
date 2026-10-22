@@ -54,7 +54,48 @@ function closeModal(){document.getElementById('modalBack').classList.remove('sho
 function registerFor(id){if(!user){toast('أنشئ حسابًا أولًا لتقديم طلب المشاركة.');showPage('account');return}let t=tournaments.find(x=>x.id===id);if(!t||t.status!=='open')return;if(regs.some(r=>r.tournamentId===id&&r.email===user.email)){toast('لديك طلب مسجل لهذه البطولة.');return}openModal('طلب المشاركة',`<form class="form" onsubmit="submitRegistration(event,'${esc(id)}')"><div class="field"><label>اسم اللاعب داخل اللعبة</label><input name="player" required maxlength="40" placeholder="اسم اللاعب"></div><div class="field"><label>Free Fire UID</label><input name="uid" required inputmode="numeric" pattern="[0-9]{5,20}" placeholder="معرّف اللاعب"></div><div class="field"><label>ملاحظة (اختياري)</label><textarea name="note" maxlength="300" placeholder="أي معلومات إضافية"></textarea></div><button class="btn primary">إرسال الطلب</button></form>`)}
 function submitRegistration(e,id){e.preventDefault();let f=new FormData(e.target);regs=get('registrations',[]);regs.push({id:'r'+Date.now(),tournamentId:id,tournamentName:tournaments.find(t=>t.id===id)?.name,email:user.email,player:f.get('player'),uid:f.get('uid'),note:f.get('note'),status:'pending',date:new Date().toLocaleString('ar-TN')});set('registrations',regs);closeModal();toast('تم حفظ الطلب في هذا المتصفح التجريبي.');render()}
 function renderAccount(){let a=document.getElementById('accountArea');if(!user){a.innerHTML=`<p class="muted">هذه النسخة التجريبية تستخدم ملف لاعب محليًا فقط. تسجيل الدخول الحقيقي بالبريد وGoogle يحتاج إلى ربط Firebase.</p><div class="form"><div class="field"><label>اسم العرض</label><input id="demoName" placeholder="اسم اللاعب"></div><div class="field"><label>البريد الإلكتروني</label><input id="demoEmail" type="email" placeholder="name@example.com"></div><button class="btn primary" onclick="demoLogin()">متابعة في الوضع التجريبي</button></div><div class="notice">لا تدخل كلمة مرور هنا. هذا ليس تسجيل دخول حقيقيًا، ولا تتم مزامنة البيانات بين الأجهزة.</div>`;return}let mine=regs.filter(r=>r.email===user.email);a.innerHTML=`<div class="row"><div><h3>${esc(user.name)}</h3><p class="muted">${esc(user.email)}</p></div><button class="btn" onclick="logout()">تسجيل الخروج</button></div><div class="divider"></div><h3>طلباتي</h3>${mine.length?mine.map(r=>`<div class="card" style="margin:10px 0"><strong>${esc(r.tournamentName)}</strong><p>اللاعب: ${esc(r.player)} · UID: ${esc(r.uid)}</p><span class="tag">${esc(({pending:'قيد المراجعة',approved:'مقبول',rejected:'مرفوض',cancelled:'ملغى'})[r.status]||r.status)}</span></div>`).join(''):'<div class="empty">لم ترسل طلبات مشاركة بعد.</div>'}<div class="notice">الحساب محلي تجريبي؛ بياناته موجودة في هذا المتصفح فقط.</div>`}
-function demoLogin(){let n=document.getElementById('demoName').value.trim(),e=document.getElementById('demoEmail').value.trim();if(!n||!e||!e.includes('@')){toast('أدخل اسمًا وبريدًا صحيحًا.');return}user={name:n,email:e.toLowerCase()};set('user',user);render();toast('تم إنشاء ملف تجريبي محلي.')}
+
+async function demoLogin(){
+  const name = document.getElementById('demoName').value.trim();
+  const email = document.getElementById('demoEmail').value.trim();
+
+  if (!name || !email || !email.includes('@')) {
+    toast('أدخل اسمًا وبريدًا صحيحًا.');
+    return;
+  }
+
+  const password = prompt('أدخل كلمة مرور من 6 أحرف على الأقل لإنشاء حسابك:');
+  if (password === null) return;
+
+  if (password.length < 6) {
+    toast('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+    return;
+  }
+
+  const freeFireUid = prompt('أدخل معرّف Free Fire UID:');
+  if (!freeFireUid || !/^[0-9]{5,20}$/.test(freeFireUid.trim())) {
+    toast('أدخل UID صحيحًا مكوّنًا من 5 إلى 20 رقمًا.');
+    return;
+  }
+
+  try {
+    await window.FABFirebase.register(name, email, password, freeFireUid);
+    user = { name, email: email.toLowerCase() };
+    set('user', user);
+    render();
+    toast('تم إنشاء الحساب بنجاح.');
+  } catch (error) {
+    toast(
+      error.code === 'auth/email-already-in-use'
+        ? 'هذا البريد مسجل بالفعل.'
+        : error.code === 'auth/weak-password'
+        ? 'كلمة المرور ضعيفة.'
+        : 'تعذّر إنشاء الحساب. تحقق من إعدادات Firebase.'
+    );
+    console.error(error);
+  }
+ }
+ {let n=document.getElementById('demoName').value.trim(),e=document.getElementById('demoEmail').value.trim();if(!n||!e||!e.includes('@')){toast('أدخل اسمًا وبريدًا صحيحًا.');return}user={name:n,email:e.toLowerCase()};set('user',user);render();toast('تم إنشاء ملف تجريبي محلي.')}
 function logout(){user=null;set('user',null);render();toast('تم تسجيل الخروج من الملف التجريبي.')}
 function renderAdmin(){let a=document.getElementById('adminArea');a.innerHTML=`<div class="panel"><h3>إضافة بطولة</h3><form class="form" onsubmit="addTournament(event)"><div class="field"><label>اسم البطولة</label><input name="name" required maxlength="80"></div><div class="field"><label>النمط</label><input name="mode" required value="Clash Squad — 1 ضد 1"></div><div class="field"><label>السيرفر</label><input name="server" required value="الشرق الأوسط (ME)"></div><div class="field"><label>الجوائز</label><input name="prize" required value="جواهر Free Fire"></div><div class="field"><label>التاريخ</label><input name="date" required placeholder="مثال: 2026-11-15"></div><div class="field"><label>عدد المقاعد</label><input name="max" type="number" min="2" max="10000" value="64" required></div><div class="field"><label>الحالة</label><select name="status"><option value="open">التسجيل مفتوح</option><option value="upcoming">قريبًا</option><option value="full">مكتملة</option><option value="live">مباشرة</option><option value="completed">انتهت</option></select></div><div class="field"><label>الوصف</label><textarea name="description" required></textarea></div><button class="btn primary">إضافة البطولة</button></form></div><div class="panel" style="margin-top:16px"><h3>إدارة البطولات</h3>${tournaments.map(t=>`<div class="card" style="margin:10px 0"><div class="row"><strong>${esc(t.name)}</strong><button class="btn" onclick="deleteTournament('${esc(t.id)}')">حذف</button></div><div class="row" style="margin-top:10px"><span class="muted">${esc(statusLabel(t.status))}</span><select onchange="changeStatus('${esc(t.id)}',this.value)">${[['open','التسجيل مفتوح'],['upcoming','قريبًا'],['full','مكتملة'],['live','مباشرة'],['completed','انتهت']].map(([v,l])=>`<option value="${v}" ${t.status===v?'selected':''}>${l}</option>`).join('')}</select></div></div>`).join('')}</div><div class="panel" style="margin-top:16px"><h3>طلبات المشاركة (${regs.length})</h3>${regs.length?regs.map(r=>`<div class="card" style="margin:10px 0"><strong>${esc(r.player)} — ${esc(r.tournamentName)}</strong><p>UID: ${esc(r.uid)} · ${esc(r.email)}<br><span class="muted">${esc(r.date)}</span></p><div class="row"><span class="tag">${esc(({pending:'قيد المراجعة',approved:'مقبول',rejected:'مرفوض'})[r.status]||r.status)}</span><div><button class="btn" onclick="setRegStatus('${esc(r.id)}','approved')">قبول</button> <button class="btn" onclick="setRegStatus('${esc(r.id)}','rejected')">رفض</button></div></div></div>`).join(''):'<div class="empty">لا توجد طلبات.</div>'}</div><div class="panel" style="margin-top:16px"><h3>نشر خبر</h3><form class="form" onsubmit="addNews(event)"><div class="field"><label>عنوان الخبر</label><input name="title" required maxlength="100"></div><div class="field"><label>المحتوى</label><textarea name="body" required maxlength="1500"></textarea></div><button class="btn primary">نشر الخبر</button></form><div class="divider"></div><h3>الأخبار المنشورة</h3>${news.map(n=>`<div class="row" style="padding:8px 0"><span>${esc(n.title)}</span><button class="btn" onclick="deleteNews('${esc(n.id)}')">حذف</button></div>`).join('')}</div><div class="notice danger">تنبيه أمني: هذه لوحة محلية تجريبية وليست لوحة إدارة حقيقية. أي شخص يفتح هذا الملف يستطيع التحكم بالبيانات المحلية في جهازه. يجب تطبيق صلاحيات خادمية قبل الإطلاق.</div>`}
 function addTournament(e){e.preventDefault();let f=new FormData(e.target);tournaments=get('tournaments',defaultTournaments);tournaments.unshift({id:'t'+Date.now(),name:f.get('name'),mode:f.get('mode'),server:f.get('server'),prize:f.get('prize'),date:f.get('date'),max:Number(f.get('max')),status:f.get('status'),description:f.get('description')});set('tournaments',tournaments);e.target.reset();render();toast('أُضيفت البطولة في النسخة المحلية.')}
