@@ -64,4 +64,5 @@ function setRegStatus(id,s){let a=get('registrations',[]);let r=a.find(x=>x.id==
 function addNews(e){e.preventDefault();let f=new FormData(e.target);let a=get('news',defaultNews);a.unshift({id:'n'+Date.now(),title:f.get('title'),body:f.get('body'),date:new Date().toLocaleDateString('ar-TN')});set('news',a);render();toast('نُشر الخبر محليًا.')}
 function deleteNews(id){set('news',get('news',defaultNews).filter(n=>n.id!==id));render();toast('تم حذف الخبر محليًا.')}
 render();
+<script type="module" src="./firebase.js"></script>
 </script></body></html>
