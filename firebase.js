@@ -1,7 +1,21 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA22QAbB1zhEed_j0tmffF3mQ9lsOkBcu4",
@@ -13,6 +27,51 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// إنشاء حساب لاعب
+export async function createPlayerAccount(name, email, password, freeFireUid) {
+  const credential = await createUserWithEmailAndPassword(
+    auth,
+    email.trim(),
+    password
+  );
+
+  await setDoc(doc(db, "players", credential.user.uid), {
+    displayName: name.trim(),
+    email: email.trim(),
+    freeFireUid: String(freeFireUid).trim(),
+    createdAt: serverTimestamp()
+  });
+
+  return credential.user;
+}
+
+// تسجيل الدخول
+export async function loginPlayer(email, password) {
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    email.trim(),
+    password
+  );
+
+  return credential.user;
+}
+
+// جلب بيانات اللاعب المسجل
+export async function getPlayerProfile() {
+  const user = auth.currentUser;
+  if (!user) return null;
+
+  const snapshot = await getDoc(doc(db, "players", user.uid));
+  return snapshot.exists() ? snapshot.data() : null;
+}
+
+// تسجيل الخروج
+export async function logoutPlayer() {
+  await signOut(auth);
+}
+
+// متابعة حالة تسجيل الدخول
+export { onAuthStateChanged };
